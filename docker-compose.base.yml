@@ -45,8 +45,6 @@ services:
       - "8081:8081"
     environment:
       SCHEMA_REGISTRY_HOST_NAME: schema-registry
-      # SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: SSL://kafka-sebin-dev-sandbox.aivencloud.com:12693
-      # SCHEMA_REGISTRY_KAFKASTORE_LISTENERS: http://0.0.0.0:8081
 
   kafka-rest:
     image: confluentinc/cp-kafka-rest:7.3.0
