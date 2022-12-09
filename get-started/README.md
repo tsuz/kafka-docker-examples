@@ -34,7 +34,31 @@ WatchedEvent state:SyncConnected type:None path:null
 
 ```
 
+### Send and receive messages
 
+1. Log into any container that has Kafka CLI.
+
+```
+# log into zookeeper container
+> docker exec -it zookeeper /bin/bash
+
+# create a consumer (receiver) and receive messages from broker
+> kafka-console-consumer --bootstrap-server broker:29092 --topic my-topic
+```
+
+2. Open another terminal shell and log into zookeeper container.
+```
+# log into zookeeper container
+> docker exec -it zookeeper /bin/bash
+
+# create a producer (sender) and send messages to the broker
+> kafka-console-producer --bootstrap-server broker:29092 --topic my-topic
+key, {"foo": "bar"}
+```
+
+3. Notice messages are received by the consumer. 
+
+Note: The consumers and producers can be run from local machine by connecting to localhost:9092.
 
 ## Notes
 
