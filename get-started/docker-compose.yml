@@ -1,0 +1,21 @@
+version: '3'
+services:
+
+  # kafka broker
+  broker:
+    extends:
+        file: ./../docker-compose.base.yml
+        service: broker
+    depends_on:
+      - zookeeper
+    environment:
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+  
+
+  zookeeper:
+    extends:
+        file: ./../docker-compose.base.yml
+        service: zookeeper
+
