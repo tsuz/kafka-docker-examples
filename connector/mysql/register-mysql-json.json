@@ -1,0 +1,22 @@
+
+
+{
+    "name": "mysql-json-connector",
+    "config": {
+        "connector.class": "io.debezium.connector.mysql.MySqlConnector",
+        "tasks.max": "1",
+        "database.hostname": "mysql",
+        "database.port": "3306",
+        "database.user": "connector",
+        "database.password": "connector-password",
+        "database.server.id": "2",
+        "database.server.name": "mysql-json",
+        "database.include.list": "example",
+        "database.history.kafka.bootstrap.servers": "broker:29092",
+        "database.history.kafka.topic": "schema-changes.mysql.inventory",
+        "key.converter": "org.apache.kafka.connect.json.JsonConverter",
+        "key.converter.schemas.enable": "false",
+        "value.converter": "org.apache.kafka.connect.json.JsonConverter",
+        "value.converter.schemas.enable": "false"
+    }
+}

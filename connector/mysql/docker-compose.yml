@@ -1,0 +1,97 @@
+---
+version: '3'
+
+services:
+  # MySQL DB as source connector
+  mysql:
+    container_name: mysql
+    hostname: mysql
+    image: mysql:8.0.31
+    volumes:
+      - ./initdb.d:/docker-entrypoint-initdb.d
+    ports:
+      - 3306:3306
+    command: 
+      - mysqld 
+      # to handle m1 mac error
+      - --innodb_use_native_aio=0 
+    environment:
+      - MYSQL_ROOT_PASSWORD=rootpassword
+
+  # Kafka configuration
+  schema-registry:
+    extends:
+        file: ./../../docker-compose.base.yml
+        service: schema-registry
+    depends_on:
+      - broker
+    environment:
+      SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: PLAINTEXT://broker:29092
+      SCHEMA_REGISTRY_LISTENERS: http://schema-registry:8081
+
+  zookeeper:
+    extends:
+        file: ./../../docker-compose.base.yml
+        service: zookeeper
+
+  broker:
+    extends:
+        file: ./../../docker-compose.base.yml
+        service: broker
+    depends_on:
+      - zookeeper
+    environment:
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+
+  # MySQL Connector
+  mysql-connect:
+    image: confluentinc/cp-server-connect:7.3.0
+    platform: linux/x86_64
+    restart: always
+    hostname: mysql-connect
+    container_name: mysql-connect
+    depends_on:
+      - schema-registry
+      - mysql
+    ports:
+      - "8083:8083"
+    volumes:
+      - ./data:/data
+    environment:
+      CONNECT_BOOTSTRAP_SERVERS: PLAINTEXT://broker:29092
+      CONNECT_GROUP_ID: "mysql-source-connect"
+      CONNECT_LISTENERS: http://:8083
+      
+      CONNECT_CONFIG_STORAGE_TOPIC: "mysql-source-connect-configs"
+      CONNECT_OFFSET_STORAGE_TOPIC: "mysql-source-connect-offsets"
+      CONNECT_STATUS_STORAGE_TOPIC: "mysql-source-connect-status"
+
+      CONNECT_REPLICATION_FACTOR: 1
+      CONNECT_CONFIG_STORAGE_REPLICATION_FACTOR: 1
+      CONNECT_OFFSET_STORAGE_REPLICATION_FACTOR: 1
+      CONNECT_STATUS_STORAGE_REPLICATION_FACTOR: 1
+
+      CONNECT_CONFLUENT_TOPIC_REPLICATION_FACTOR: 1
+      
+      CONNECT_KEY_CONVERTER: "org.apache.kafka.connect.storage.StringConverter"
+
+      # Confluent Schema Registry for Kafka Connect
+      CONNECT_VALUE_CONVERTER: "io.confluent.connect.avro.AvroConverter"
+      CONNECT_VALUE_CONVERTER_SCHEMAS_ENABLE: "true"
+      CONNECT_VALUE_CONVERTER_SCHEMA_REGISTRY_URL: PLAINTEXT://schema-registry:8081
+
+      CONNECT_REST_ADVERTISED_HOST_NAME: "mysql-connect"
+      CONNECT_PLUGIN_PATH: "/usr/share/confluent-hub-components"
+
+    command:
+      - bash
+      - -c
+      - |
+        echo "Installing Connector"
+        confluent-hub install --no-prompt debezium/debezium-connector-mysql:1.9.7
+        #
+        echo "Launching Kafka Connect worker"
+        /etc/confluent/docker/run &
+        #
+        sleep infinity
