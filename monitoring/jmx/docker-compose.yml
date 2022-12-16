@@ -1,0 +1,16 @@
+version: '3'
+services:
+
+  zookeeper:
+    extends:
+        file: ./../../docker-compose.base.yml
+        service: zookeeper
+
+  broker:
+    extends:
+        file: ./../../docker-compose.base.yml
+        service: broker
+    depends_on:
+      - zookeeper
+    environment:
+      KAFKA_JMX_PORT: 49999
