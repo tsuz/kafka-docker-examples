@@ -1,0 +1,157 @@
+---
+version: '3'
+
+services:
+
+  elasticsearch:
+    hostname: elasticsearch
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.0.0
+    container_name: elasticsearch
+    ports:
+      - 9200:9200
+    environment:
+      discovery.type: single-node
+      ES_JAVA_OPTS: -Xms1g -Xmx1g
+      ES_PORT: 9200
+      # to enable curl. Remove this for production
+      xpack.security.enabled: "false"
+  
+  # Exists only to create an index
+  elasticsearch-post-process:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.0.0
+    container_name: elasticsearch-post-process
+    depends_on:
+      - elasticsearch
+    command:
+      - bash
+      - -c
+      - |
+        echo "Waiting for Elasticsearch to start listening on :9200 ⏳"
+        while : ; do
+            curl_status=$$(curl -s -o /dev/null -w %{http_code} http://elasticsearch:9200)
+            echo -e $$(date) " Elasticsearch waiting for HTTP state: " $$curl_status " (waiting for 200)"
+            if [ $$curl_status -eq 200 ] ; then
+            break
+            fi
+            sleep 5
+        done
+        echo -e "\n--\n+> REST API READY! Creating Elasticsearch Index"
+
+        curl -i -X PUT -H "Accept:application/json" \
+            -H  "Content-Type:application/json" \
+            http://elasticsearch:9200/example-index \  -d '{
+              "mappings": {
+                "properties": {
+                  "id": {
+                    "type": "keyword"
+                  },
+                  "age":  { "type": "integer" },
+                  "name": { 
+                    "properties": {
+                      "first": { "type": "text" },
+                      "last":  { "type": "text" }
+                    }
+                  },
+                  "@timestamp": {
+                    "format":"YYYY-MM-DD HH:mm:ss",
+                    "type": "date"
+                  }
+                }
+              }
+            }'
+        
+        curl -X POST -H  "Content-Type:application/json" \
+          http://elasticsearch:9200/example-index/_doc \  -d '{
+            "id": "12345",
+            "age": 30,
+            "name": {
+              "first": "Taku",
+              "last": "Foo"
+            },
+            "@timestamp": "2023-01-13 01:12:00"
+        }'
+
+      
+  zookeeper:
+    extends:
+        file: ./../../docker-compose.base.yml
+        service: zookeeper
+
+  broker:
+    extends:
+        file: ./../../docker-compose.base.yml
+        service: broker
+    depends_on:
+      - zookeeper
+    environment:
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+
+  connect-1:
+    image: confluentinc/cp-server-connect:7.3.0
+    platform: linux/x86_64
+    restart: always
+    hostname: connect-1
+    container_name: connect-1
+    deploy:
+      resources:
+        reservations:
+          memory: 1G
+    ports:
+      - "8083:8083"
+    volumes:
+      - ./data:/data
+      - $PWD/connect-plugins:/connect-plugins
+    environment:
+      CONNECT_BOOTSTRAP_SERVERS: PLAINTEXT://broker:29092
+      CONNECT_GROUP_ID: "kc101-connect"
+      CONNECT_LISTENERS: http://:8083
+      
+      CONNECT_CONFIG_STORAGE_TOPIC: "_kc101-connect-configs"
+      CONNECT_OFFSET_STORAGE_TOPIC: "_kc101-connect-offsets"
+      CONNECT_STATUS_STORAGE_TOPIC: "_kc101-connect-status"
+
+      CONNECT_REPLICATION_FACTOR: 1
+      CONNECT_CONFIG_STORAGE_REPLICATION_FACTOR: 1
+      CONNECT_OFFSET_STORAGE_REPLICATION_FACTOR: 1
+      CONNECT_STATUS_STORAGE_REPLICATION_FACTOR: 1
+      CONNECT_CONFLUENT_TOPIC_REPLICATION_FACTOR: 1
+      
+      CONNECT_KEY_CONVERTER: "org.apache.kafka.connect.storage.StringConverter"
+      CONNECT_VALUE_CONVERTER: "org.apache.kafka.connect.json.JsonConverter"
+      CONNECT_VALUE_CONVERTER_SCHEMAS_ENABLE: "false"
+      CONNECT_REST_ADVERTISED_HOST_NAME: "connect-1"
+      CONNECT_PLUGIN_PATH: "/connect-plugins"
+
+    command:
+      - bash
+      - -c
+      - |
+        
+        echo "Launching Kafka Connect Worker"
+        /etc/confluent/docker/run &
+
+        echo "Waiting for Kafka Connect to start listening on localhost:8083 ⏳"
+        while : ; do
+            curl_status=$$(curl -s -o /dev/null -w %{http_code} http://localhost:8083/connectors)
+            echo -e $$(date) " Kafka Connect waiting for HTTP state: " $$curl_status " (waiting for 200)"
+            if [ $$curl_status -eq 200 ] ; then
+            break
+            fi
+            sleep 5
+        done
+        echo -e "\n--\n+> REST API READY! Creating Kafka Connect source connectors"
+
+        curl -X PUT -H "Accept:application/json" \
+            -H  "Content-Type:application/json" \
+            http://localhost:8083/connectors/elasticsearch-source-connector/config \    -d '{
+                "connector.class":"com.github.dariobalinzo.ElasticSourceConnector",
+                "tasks.max": "1",
+                "name": "elasticsearch-source-connector",
+                "es.host" : "elasticsearch",
+                "es.port" : "9200",
+                "poll.interval.ms": 2000,
+                "topic.prefix" : "es_",
+                "incrementing.field.name" : "@timestamp"
+            }'
+        sleep infinity
