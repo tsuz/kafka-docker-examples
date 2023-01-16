@@ -1,0 +1,150 @@
+---
+version: '3'
+
+services:
+
+  elasticsearch:
+    hostname: elasticsearch
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.1.1
+    container_name: elasticsearch
+    ports:
+      - 9200:9200
+    environment:
+      discovery.type: single-node
+      ES_JAVA_OPTS: -Xms1g -Xmx1g
+      ES_PORT: 9200
+      # to enable curl. Remove this for production
+      xpack.security.enabled: "false"
+
+  # Exists only to create an index
+  elasticsearch-post-process:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.1.1
+    container_name: elasticsearch-post-process
+    depends_on:
+      - elasticsearch
+    command:
+      - bash
+      - -c
+      - |
+        echo "Waiting for Elasticsearch to start listening on :9200 ⏳"
+        while : ; do
+            curl_status=$$(curl -s -o /dev/null -w %{http_code} http://elasticsearch:9200)
+            echo -e $$(date) " Elasticsearch waiting for HTTP state: " $$curl_status " (waiting for 200)"
+            if [ $$curl_status -eq 200 ] ; then
+            break
+            fi
+            sleep 5
+        done
+        echo -e "\n--\n+> REST API READY! Creating Elasticsearch Index"
+
+        curl -i -X PUT -H "Accept:application/json" \
+            -H  "Content-Type:application/json" \
+            http://elasticsearch:9200/products-info \
+            -d '{
+              "mappings": {
+                "properties": {
+                  "id": { "type": "keyword" },
+                  "name":  { "type": "text" },
+                  "category":  { "type": "text" },
+                  "price":  { "type": "integer" }
+                }
+              }
+            }'
+
+
+  zookeeper:
+    extends:
+        file: ./../../docker-compose.base.yml
+        service: zookeeper
+
+  broker:
+    extends:
+        file: ./../../docker-compose.base.yml
+        service: broker
+    depends_on:
+      - zookeeper
+    environment:
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+
+  # Kafka configuration
+  schema-registry:
+    extends:
+        file: ./../../docker-compose.base.yml
+        service: schema-registry
+    depends_on:
+      - broker
+    environment:
+      SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: PLAINTEXT://broker:29092
+      SCHEMA_REGISTRY_LISTENERS: http://schema-registry:8081
+
+  connect-1:
+    image: confluentinc/cp-server-connect:7.3.0
+    restart: always
+    hostname: connect-1
+    container_name: connect-1
+    ports:
+      - "8083:8083"
+    volumes:
+      - $PWD/connect-plugins:/connect-plugins
+    environment:
+      CONNECT_BOOTSTRAP_SERVERS: PLAINTEXT://broker:29092
+      CONNECT_GROUP_ID: "kc101-connect"
+      CONNECT_LISTENERS: http://:8083
+      
+      CONNECT_CONFIG_STORAGE_TOPIC: "_kc101-connect-configs"
+      CONNECT_OFFSET_STORAGE_TOPIC: "_kc101-connect-offsets"
+      CONNECT_STATUS_STORAGE_TOPIC: "_kc101-connect-status"
+
+      CONNECT_REPLICATION_FACTOR: 1
+      CONNECT_CONFIG_STORAGE_REPLICATION_FACTOR: 1
+      CONNECT_OFFSET_STORAGE_REPLICATION_FACTOR: 1
+      CONNECT_STATUS_STORAGE_REPLICATION_FACTOR: 1
+      CONNECT_CONFLUENT_TOPIC_REPLICATION_FACTOR: 1
+      
+      CONNECT_KEY_CONVERTER: "org.apache.kafka.connect.storage.StringConverter"
+      
+      CONNECT_VALUE_CONVERTER: "io.confluent.connect.avro.AvroConverter"
+      CONNECT_VALUE_CONVERTER_SCHEMAS_ENABLE: "true"
+      CONNECT_VALUE_CONVERTER_SCHEMA_REGISTRY_URL: http://schema-registry:8081
+      
+      CONNECT_REST_ADVERTISED_HOST_NAME: "connect-1"
+      CONNECT_PLUGIN_PATH: "/connect-plugins"
+
+  # Exists only to create a connect task
+  connect-post-process:
+    image: confluentinc/cp-server-connect:7.3.0
+    hostname: post-connect
+    container_name: post-connect
+    depends_on:
+      - connect-1
+    command:
+    - bash
+    - -c
+    - |
+
+      echo "Waiting for Kafka Connect to start listening on connect-1:8083 ⏳"
+      while : ; do
+          curl_status=$$(curl -s -o /dev/null -w %{http_code} http://connect-1:8083/connectors)
+          echo -e $$(date) " Kafka Connect waiting for HTTP state: " $$curl_status " (waiting for 200)"
+          if [ $$curl_status -eq 200 ] ; then
+          break
+          fi
+          sleep 10
+      done
+
+      echo -e "\n--\n+> REST API READY! Creating Kafka Connect source connectors"
+
+      curl -i -X PUT -H "Accept:application/json" \
+        -H  "Content-Type:application/json" \
+        http://connect-1:8083/connectors/elasticsearch-sink-connector/config \
+        -d '{ 
+          "connector.class": "io.confluent.connect.elasticsearch.ElasticsearchSinkConnector",                 
+          "tasks.max": "1",
+          "topics": "products-info",
+          "name": "elasticsearch-sink-connector",
+          "key.ignore": "true",
+          "connection.url": "http://elasticsearch:9200",
+          "type.name": "_doc" }'
+
+      sleep infinity
