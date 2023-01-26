@@ -52,14 +52,3 @@ services:
         file: ./../../docker-compose.base.yml
         service: zookeeper
 
-
-  # Kafka configuration
-  # schema-registry:
-  #   extends:
-  #       file: ./../../docker-compose.base.yml
-  #       service: schema-registry
-  #   depends_on:
-  #     - broker
-  #   environment:
-  #     SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: PLAINTEXT://broker:29092
-  #     SCHEMA_REGISTRY_LISTENERS: http://schema-registry:8081
