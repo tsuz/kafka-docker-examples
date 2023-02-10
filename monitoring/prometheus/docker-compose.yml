@@ -1,0 +1,249 @@
+version: '2'
+services:
+  
+  zookeeper:
+    extends:
+        file: ./../../docker-compose.base.yml
+        service: zookeeper
+    environment:
+        KAFKA_OPTS: -javaagent:/usr/share/jmx_exporter/jmx_prometheus_javaagent-0.12.0.jar=1234:/usr/share/jmx_exporter/zookeeper.yml
+    volumes:
+      - ./jmx-exporter:/usr/share/jmx_exporter/
+  
+  broker:
+    extends:
+        file: ./../../docker-compose.base.yml
+        service: broker
+    depends_on:
+      - zookeeper
+    environment:
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_OPTS: -javaagent:/usr/share/jmx_exporter/jmx_prometheus_javaagent-0.12.0.jar=1234:/usr/share/jmx_exporter/broker.yml
+    volumes:
+      - ./jmx-exporter:/usr/share/jmx_exporter/
+
+  prometheus:
+    container_name: prometheus
+    hostname: prometheus
+    image: prom/prometheus
+    ports:
+      - 9090:9090/tcp
+    volumes:
+      - .:/etc/prometheus
+    # command:
+      # - --web.enable-lifecycle
+    links:
+      - broker
+
+  grafana:
+    container_name: grafana
+    hostname: grafana
+    image: grafana/grafana
+    ports:
+      - 3000:3000
+    volumes:
+      - ./grafana/dashboards:/etc/grafana/provisioning/dashboards
+      - ./grafana/datasources:/etc/grafana/provisioning/datasources
+    environment:
+      GF_INSTALL_PLUGINS: grafana-piechart-panel
+
+      # disables login - comment out all these env vars in production
+      GF_AUTH_DISABLE_LOGIN_FORM: "true"
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_NAME: "Main Org."
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Admin
+      GF_USERS_ALLOW_SIGN_UP: "false"
+
+  schema-registry:
+    extends:
+      file: ./../../docker-compose.base.yml
+      service: schema-registry
+    depends_on:
+      - broker
+    environment:
+      SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: PLAINTEXT://broker:29092
+      SCHEMA_REGISTRY_LISTENERS: http://schema-registry:8081
+      SCHEMA_REGISTRY_OPTS: -javaagent:/usr/share/jmx_exporter/jmx_prometheus_javaagent-0.12.0.jar=1234:/usr/share/jmx_exporter/broker.yml
+    volumes:
+      - ./jmx-exporter:/usr/share/jmx_exporter/
+
+  control-center:
+    extends:
+      file: ./../../docker-compose.base.yml
+      service: control-center
+
+
+  connect-exporter:
+    platform: linux/amd64
+    container_name: connect-exporter
+    hostname: connect-exporter
+    # There is no Docker image for github.com/prometheus/jmx_exporter
+    image: sscaling/jmx-prometheus-exporter
+    deploy:
+      resources:
+        limits:
+          cpus: '8'
+          memory: 20G
+    environment:
+      SERVICE_PORT: 5556
+    volumes:
+      - $PWD/jmx-exporter/connect.yml:/opt/jmx_exporter/config.yml
+
+  connect-exporter2:
+    platform: linux/amd64
+    container_name: connect-exporter2
+    hostname: connect-exporter2
+    # There is no Docker image for github.com/prometheus/jmx_exporter
+    image: sscaling/jmx-prometheus-exporter
+    deploy:
+      resources:
+        limits:
+          cpus: '8'
+          memory: 20G
+    environment:
+      SERVICE_PORT: 5556
+    volumes:
+      - $PWD/jmx-exporter/connect2.yml:/opt/jmx_exporter/config.yml
+
+  connect-exporter3:
+    platform: linux/amd64
+    container_name: connect-exporter3
+    hostname: connect-exporter3
+    # There is no Docker image for github.com/prometheus/jmx_exporter
+    image: sscaling/jmx-prometheus-exporter
+    deploy:
+      resources:
+        limits:
+          cpus: '8'
+          memory: 20G
+    environment:
+      SERVICE_PORT: 5556
+    volumes:
+      - $PWD/jmx-exporter/connect3.yml:/opt/jmx_exporter/config.yml
+
+
+  connect:
+    platform: linux/amd64,linux/arm64,linux/arm/v7 
+    extends:
+        file: ./../../docker-compose.base.yml
+        service: connect-sr
+    depends_on:
+      - schema-registry
+    deploy:
+      resources:
+        limits:
+          cpus: '8'
+          memory: 20G
+    ports:
+      - "8083:8083"
+    environment:
+      CONNECT_GROUP_ID: "monitoring-prometheus-connect"
+      
+      CONNECT_CONFIG_STORAGE_TOPIC: "_monitoring-prometheus-connect-configs"
+      CONNECT_OFFSET_STORAGE_TOPIC: "_monitoring-prometheus-connect-offsets"
+      CONNECT_STATUS_STORAGE_TOPIC: "_monitoring-prometheus-connect-status"
+      CONNECT_REST_ADVERTISED_HOST_NAME: "connect"
+      KAFKA_JMX_PORT: 59999
+
+      KAFKA_OPTS: -javaagent:/usr/share/jmx_exporter/jmx_prometheus_javaagent-0.12.0.jar=1234:/usr/share/jmx_exporter/connect.yml
+    volumes:
+      - ./jmx-exporter:/usr/share/jmx_exporter/
+
+  connect2:
+    hostname: connect2
+    container_name: connect2
+    platform: linux/amd64,linux/arm64,linux/arm/v7 
+    extends:
+        file: ./../../docker-compose.base.yml
+        service: connect-sr
+    depends_on:
+      - schema-registry
+    deploy:
+      resources:
+        limits:
+          cpus: '8'
+          memory: 20G
+    ports:
+      - "8084:8083"
+    environment:
+      CONNECT_GROUP_ID: "monitoring-prometheus-connect"
+      
+      CONNECT_CONFIG_STORAGE_TOPIC: "_monitoring-prometheus-connect-configs"
+      CONNECT_OFFSET_STORAGE_TOPIC: "_monitoring-prometheus-connect-offsets"
+      CONNECT_STATUS_STORAGE_TOPIC: "_monitoring-prometheus-connect-status"
+      CONNECT_REST_ADVERTISED_HOST_NAME: "connect2"
+      KAFKA_JMX_PORT: 59998
+
+      KAFKA_OPTS: -javaagent:/usr/share/jmx_exporter/jmx_prometheus_javaagent-0.12.0.jar=1234:/usr/share/jmx_exporter/connect.yml
+    volumes:
+      - ./jmx-exporter:/usr/share/jmx_exporter/
+
+  connect3:
+    hostname: connect3
+    container_name: connect3
+    platform: linux/amd64,linux/arm64,linux/arm/v7 
+    extends:
+        file: ./../../docker-compose.base.yml
+        service: connect-sr
+    depends_on:
+      - schema-registry
+    deploy:
+      resources:
+        limits:
+          cpus: '8'
+          memory: 20G
+    ports:
+      - "8085:8083"
+    environment:
+      CONNECT_GROUP_ID: "monitoring-prometheus-connect"
+      
+      CONNECT_CONFIG_STORAGE_TOPIC: "_monitoring-prometheus-connect-configs"
+      CONNECT_OFFSET_STORAGE_TOPIC: "_monitoring-prometheus-connect-offsets"
+      CONNECT_STATUS_STORAGE_TOPIC: "_monitoring-prometheus-connect-status"
+      CONNECT_REST_ADVERTISED_HOST_NAME: "connect3"
+      KAFKA_JMX_PORT: 59997
+
+      KAFKA_OPTS: -javaagent:/usr/share/jmx_exporter/jmx_prometheus_javaagent-0.12.0.jar=1234:/usr/share/jmx_exporter/connect.yml
+    volumes:
+      - ./jmx-exporter:/usr/share/jmx_exporter/
+
+  # Exists only to create a task
+  connect-post-process:
+    image: confluentinc/cp-server-connect:7.3.0
+    hostname: post-connect
+    container_name: post-connect
+    depends_on:
+      - connect
+    command:
+    - bash
+    - -c
+    - |
+
+      echo "Waiting for Kafka Connect to start listening on connect:8083 ⏳"
+      while : ; do
+          curl_status=$$(curl -s -o /dev/null -w %{http_code} http://connect:8083/connectors)
+          echo -e $$(date) " Kafka Connect waiting for HTTP state: " $$curl_status " (waiting for 200)"
+          if [ $$curl_status -eq 200 ] ; then
+          break
+          fi
+          sleep 10
+      done
+
+      echo -e "\n--\n+> REST API READY! Creating Kafka Connect source connectors"
+
+      curl -i -X PUT -H "Accept:application/json" \
+        -H  "Content-Type:application/json" \
+        http://connect:8083/connectors/datagen-connector/config \
+        -d '{
+          "connector.class": "io.confluent.kafka.connect.datagen.DatagenConnector",
+          "kafka.topic": "transactions",
+          "quickstart": "transactions",
+          "key.converter": "org.apache.kafka.connect.storage.StringConverter",
+          "value.converter": "org.apache.kafka.connect.json.JsonConverter",
+          "value.converter.schemas.enable": "false",
+          "max.interval": 1000,
+          "tasks.max": "3"
+        }'
+
+      sleep infinity

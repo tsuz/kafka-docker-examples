@@ -1,0 +1,54 @@
+global:
+  scrape_interval: 10s
+
+scrape_configs:
+- job_name: kafka
+  scrape_interval: 10s
+  static_configs:
+    - targets: 
+      - 'broker:1234'
+  # relabel_configs:
+  #     - source_labels: [__address__]
+  #       target_label: hostname
+  #       regex: '([^:]+)(:[0-9]+)?'
+  #       replacement: '${1}'
+
+- job_name: zookeeper
+  scrape_interval: 5s
+  static_configs:
+    - targets: 
+      - 'zookeeper:1234'
+  relabel_configs:
+    - source_labels: [__address__]
+      target_label: hostname
+      regex: '([^:]+)(:[0-9]+)?'
+      replacement: '${1}'
+
+- job_name: connect
+  scrape_interval: 10s
+  static_configs:
+    - targets: 
+      - 'connect-exporter:5556'
+      - 'connect-exporter2:5556'
+      - 'connect-exporter3:5556'
+      labels:
+        cluster: 'cluster1'
+      # - 'connect:1234'
+      # - 'connect2:1234'
+      # - 'connect3:1234'
+  # relabel_configs:
+  #   - source_labels: [__address__]
+  #     target_label: hostname
+  #     regex: '([^:]+)(:[0-9]+)?'
+  #     replacement: '${1}'
+
+- job_name: schema-registry
+  scrape_interval: 10s
+  static_configs:
+    - targets: 
+      - 'schema-registry:1234'
+  # relabel_configs:
+  #   - source_labels: [__address__]
+  #     target_label: hostname
+  #     regex: '([^:]+)(:[0-9]+)?'
+  #     replacement: '${1}'
