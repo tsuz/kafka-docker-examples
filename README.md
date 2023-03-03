@@ -17,6 +17,6 @@ This is a collection of Kafka examples using Docker.
     - [x] [MySQL Source](/connector/mysql)
     - [ ] Oracle Source
   - [High Availability](/high-availability)
-    - [Cluster Linking](/high-availability/cluster-link/)
-    - [Schema Linking](/high-availability/schema-link/)
+    - [x] [Cluster Linking](/high-availability/cluster-link/)
+    - [x] [Schema Linking](/high-availability/schema-link/)
   
