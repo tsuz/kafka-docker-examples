@@ -1,0 +1,26 @@
+{
+    "name": "LambdaSinkConnector",
+    "config" : {
+      "connector.class" : "io.confluent.connect.aws.lambda.AwsLambdaSinkConnector",
+      "name": "LambdaSinkConnector",
+      "tasks.max" : "1",
+ 
+      "topics" : "orders",
+ 
+      "aws.lambda.function.name" : "taku-lambda-sink-test-role",
+      "aws.lambda.invocation.type" : "sync",
+      "aws.lambda.batch.size" : "1",
+      "aws.lambda.region": "ap-northeast-1",
+ 
+      "behavior.on.error" : "log",
+ 
+      "confluent.topic.bootstrap.servers": "PLAINTEXT://broker:29092",
+      "confluent.topic.request.timeout.ms":20000,
+      "confluent.topic.retry.backoff.ms":500,
+      "confluent.topic.replication.factor" : "1",
+ 
+      "reporter.error.topic.name": "",
+      "reporter.result.topic.name": ""
+    }
+}
+ 

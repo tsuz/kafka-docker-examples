@@ -1,0 +1,74 @@
+version: "3"
+services:
+  connect-1:
+    image: confluentinc/cp-kafka-connect-base:7.3.3
+    platform: linux/x86_64
+    restart: always
+    hostname: connect-1
+    container_name: connect-1
+    ports:
+      - "8083:8083"
+    environment:
+      # AWS credentials needed if ~/.aws/credentials is not set on the host machine
+      AWS_DEFAULT_REGION: ${AWS_DEFAULT_REGION}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+
+      # Required to connect to confluent cloud
+      CONNECT_BOOTSTRAP_SERVERS: ${BOOTSTRAP_SERVER}
+      CONNECT_SECURITY_PROTOCOL: SASL_SSL
+      CONNECT_SASL_MECHANISM: PLAIN
+      CONNECT_SASL_JAAS_CONFIG: ${CCLOUD_JAAS_CONFIG}
+
+      # Required for sink connectors
+      CONNECT_CONSUMER_BOOTSTRAP_SERVERS: ${BOOTSTRAP_SERVER}
+      CONNECT_CONSUMER_SECURITY_PROTOCOL: SASL_SSL
+      CONNECT_CONSUMER_SASL_JAAS_CONFIG: ${CCLOUD_JAAS_CONFIG}
+      CONNECT_CONSUMER_SASL_MECHANISM: PLAIN
+
+      # Empty ok for 30 days
+      CONFLUENT_LICENSE: ${CONFLUENT_LICENSE}
+
+
+      # Required to create these three topics if the server doesn't allow auto create topics (i.e. Confluent Cloud)
+      CONNECT_CONFIG_STORAGE_TOPIC: "connect-configs"
+      CONNECT_OFFSET_STORAGE_TOPIC: "connect-offsets"
+      CONNECT_STATUS_STORAGE_TOPIC: "connect-status"
+      CONNECT_CONFIG_STORAGE_REPLICATION_FACTOR: 1
+      CONNECT_OFFSET_STORAGE_REPLICATION_FACTOR: 1
+      CONNECT_STATUS_STORAGE_REPLICATION_FACTOR: 1
+
+
+      # Confluent Topic config
+      CONFLUENT_TOPIC_BOOTSTRAP_SERVERS: ${BOOTSTRAP_SERVER}
+      CONFLUENT_TOPIC_SECURITY_PROTOCOL: SASL_SSL
+      CONFLUENT_TOPIC_SASL_JAAS_CONFIG: ${CCLOUD_JAAS_CONFIG}
+      CONFLUENT_TOPIC_SASL_MECHANISM: PLAIN
+      CONFLUENT_TOPIC_SSL_ENDPOINT_IDENTIFICATION_ALGORITHM: https
+      CONFLUENT_TOPIC_REQUEST_TIMEOUT_MS: 20000
+      CONFLUENT_TOPIC_RETRY_BACKOFF_MS: 500
+      CONFLUENT_TOPIC_REPLICATION_FACTOR: 1
+
+      CONNECT_KEY_CONVERTER: "org.apache.kafka.connect.storage.StringConverter"
+      CONNECT_KEY_CONVERTER_SCHEMAS_ENABLE: "false"
+
+      CONNECT_VALUE_CONVERTER: "org.apache.kafka.connect.json.JsonConverter"
+      CONNECT_VALUE_CONVERTER_SCHEMAS_ENABLE: "false"
+
+      CONNECT_REST_ADVERTISED_HOST_NAME: "connect-1"
+      CONNECT_GROUP_ID: "kc101-connect"
+      CONNECT_LISTENERS: http://:8083
+      CONNECT_REPLICATION_FACTOR: 1
+      CONNECT_PLUGIN_PATH: "/usr/share/confluent-hub-components"
+
+    command:
+      - bash
+      - -c
+      - |
+        echo "Installing Connector"
+        confluent-hub install --no-prompt confluentinc/kafka-connect-aws-lambda:2.0.5
+        #
+        echo "Launching Kafka Connect worker"
+        /etc/confluent/docker/run &
+        #
+        sleep infinity

@@ -1,0 +1,30 @@
+{
+    "name": "LambdaSinkConnector",
+    "config" : {
+      "connector.class" : "io.confluent.connect.aws.lambda.AwsLambdaSinkConnector",
+      "name": "LambdaSinkConnector",
+      "tasks.max" : "1",
+ 
+      "topics" : "orders",
+ 
+      "aws.lambda.function.name" : "taku-lambda-sink-test-role",
+      "aws.lambda.invocation.type" : "sync",
+      "aws.lambda.batch.size" : "1",
+      "aws.lambda.region": "ap-northeast-1",
+ 
+      "behavior.on.error" : "fail",
+ 
+      "confluent.topic.bootstrap.servers": "pkc-*****.ap-northeast-1.aws.confluent.cloud:9092",
+      "confluent.topic.sasl.jaas.config": "org.apache.kafka.common.security.plain.PlainLoginModule required username='*******' password='*****/****+*****';",
+      "confluent.topic.security.protocol": "SASL_SSL",
+      "confluent.topic.sasl.mechanism": "PLAIN",
+      "confluent.topic.ssl.endpoint.identification.algorithm":"https",
+      "confluent.topic.request.timeout.ms":20000,
+      "confluent.topic.retry.backoff.ms":500,
+      "confluent.topic.replication.factor" : "1",
+ 
+      "reporter.error.topic.name": "",
+      "reporter.result.topic.name": ""
+    }
+}
+ 
