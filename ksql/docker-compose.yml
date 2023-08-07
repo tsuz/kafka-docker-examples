@@ -1,0 +1,32 @@
+
+---
+version: '2'
+services:
+
+  primary-ksqldb-server:
+    image: confluentinc/ksqldb-server:0.29.0
+    hostname: primary-ksqldb-server
+    container_name: primary-ksqldb-server
+    ports:
+      - "8088:8088"
+    environment:
+      KSQL_LISTENERS: http://0.0.0.0:8088
+
+      KSQL_BOOTSTRAP_SERVERS: ${BOOTSTRAP_SERVER}
+      KSQL_SECURITY_PROTOCOL: SASL_SSL
+      KSQL_SASL_MECHANISM: PLAIN
+      KSQL_SASL_JAAS_CONFIG: ${CCLOUD_JAAS_CONFIG}
+      KSQL_KSQL_LOGGING_PROCESSING_STREAM_AUTO_CREATE: "true"
+      KSQL_KSQL_LOGGING_PROCESSING_TOPIC_AUTO_CREATE: "true"
+      KSQL_KSQL_SERVICE_ID: 1
+
+      KSQL_LOG4J_ROOT_LOGLEVEL: "INFO"
+      KSQL_LOG4J_LOGGERS: "org.apache.kafka.connect.runtime.rest=WARN,org.reflections=INFO"
+
+  ksqldb-cli:
+    image: confluentinc/ksqldb-cli:0.29.0
+    container_name: ksqldb-cli
+    depends_on:
+      - primary-ksqldb-server
+    entrypoint: /bin/sh
+    tty: true
