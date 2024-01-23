@@ -1,0 +1,24 @@
+
+---
+version: '2'
+services:
+
+  kafka-rest:
+    image: confluentinc/cp-kafka-rest:7.4.3
+    hostname: kafka-rest
+    container_name: kafka-rest
+    ports:
+      - "8089:8089"
+    environment:
+      KAFKA_REST_LISTENERS: http://0.0.0.0:8089
+
+      KAFKA_REST_BOOTSTRAP_SERVERS: ${BOOTSTRAP_SERVER}
+      KAFKA_REST_SECURITY_PROTOCOL: SASL_SSL
+      KAFKA_REST_SASL_MECHANISM: PLAIN
+      KAFKA_REST_SASL_JAAS_CONFIG: ${CCLOUD_JAAS_CONFIG}
+
+
+      KAFKA_REST_CLIENT_BOOTSTRAP_SERVERS: ${BOOTSTRAP_SERVER}
+      KAFKA_REST_CLIENT_SECURITY_PROTOCOL: SASL_SSL
+      KAFKA_REST_CLIENT_SASL_JAAS_CONFIG: ${CCLOUD_JAAS_CONFIG}
+      KAFKA_REST_CLIENT_SASL_MECHANISM: PLAIN
